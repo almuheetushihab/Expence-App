@@ -30,4 +30,10 @@ class PreferenceManager(context: Context) {
     }
 
     fun getCurrency(): String = prefs.getString("currency_symbol", "৳") ?: "৳"
+
+    fun setBiometricEnabled(isEnabled: Boolean) {
+        prefs.edit().putBoolean("biometric_enabled", isEnabled).apply()
+    }
+
+    fun isBiometricEnabled(): Boolean = prefs.getBoolean("biometric_enabled", false)
 }

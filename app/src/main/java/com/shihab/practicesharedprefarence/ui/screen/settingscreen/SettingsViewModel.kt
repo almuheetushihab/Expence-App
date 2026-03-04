@@ -29,6 +29,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _currency = mutableStateOf("৳")
     val currency: State<String> = _currency
 
+    private val _isBiometricEnabled = mutableStateOf(false)
+    val isBiometricEnabled: State<Boolean> = _isBiometricEnabled
+
     private val _backupStatus = mutableStateOf("")
     val backupStatus: State<String> = _backupStatus
 
@@ -40,6 +43,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _userName.value = pref.getUserName()
         _isDarkMode.value = pref.isDarkMode()
         _currency.value = pref.getCurrency()
+        _isBiometricEnabled.value = pref.isBiometricEnabled()
     }
 
     fun saveUserName(name: String) {
@@ -55,6 +59,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun saveCurrency(symbol: String) {
         _currency.value = symbol
         pref.saveCurrency(symbol)
+    }
+
+    fun toggleBiometric(isEnabled: Boolean) {
+        _isBiometricEnabled.value = isEnabled
+        pref.setBiometricEnabled(isEnabled)
     }
 
     fun exportData() {
