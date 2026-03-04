@@ -24,4 +24,10 @@ class PreferenceManager(context: Context) {
     }
 
     fun isDarkMode(): Boolean = prefs.getBoolean("is_dark_mode", false)
+
+    fun saveCurrency(currency: String) {
+        prefs.edit().putString("currency_symbol", currency).apply()
+    }
+
+    fun getCurrency(): String = prefs.getString("currency_symbol", "৳") ?: "৳"
 }

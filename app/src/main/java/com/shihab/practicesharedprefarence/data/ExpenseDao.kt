@@ -20,6 +20,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM expense_table ORDER BY id DESC")
     fun getAllExpenses(): Flow<List<Expense>>
 
+    @Query("SELECT * FROM expense_table WHERE (note LIKE '%' || :query || '%' OR category LIKE '%' || :query || '%') ORDER BY id DESC")
+    fun searchExpenses(query: String): Flow<List<Expense>>
+
     @Query("SELECT SUM(CAST(amount AS BIGINT)) FROM expense_table WHERE type = 'Expense'")
     fun getTotalExpense(): Flow<Long?>
 

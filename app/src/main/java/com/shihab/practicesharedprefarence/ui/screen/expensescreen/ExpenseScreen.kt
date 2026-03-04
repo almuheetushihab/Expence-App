@@ -36,15 +36,16 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var newCategoryName by remember { mutableStateOf("") }
     var newBudgetInput by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
 
     val expenseList by viewModel.expenses.observeAsState(initial = emptyList())
     val totalExpense by viewModel.totalExpense.observeAsState(initial = 0L)
     val totalIncome by viewModel.totalIncome.observeAsState(initial = 0L)
     val monthlyBudget by viewModel.monthlyBudget.observeAsState(initial = 0f)
+    val currencySymbol by viewModel.currencySymbol.observeAsState(initial = "৳")
     
     val categoryList by viewModel.getCategories(transactionType).observeAsState(initial = emptyList())
 
-    // Set default category when list changes
     LaunchedEffect(categoryList, transactionType) {
         if (category.isEmpty() || !categoryList.any { it.name == category }) {
             category = categoryList.firstOrNull()?.name ?: ""
@@ -69,7 +70,7 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                 OutlinedTextField(
                     value = newBudgetInput,
                     onValueChange = { newBudgetInput = it },
-                    label = { Text("Budget Amount (৳)") },
+                    label = { Text("Budget Amount ($currencySymbol)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -131,7 +132,6 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
             }
         }
 
-        // Dashboard Card
         Card(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             shape = RoundedCornerShape(24.dp),
@@ -139,18 +139,17 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text("Total Balance", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelLarge)
-                Text("৳ $currentBalance", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+                Text("$currencySymbol $currentBalance", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TransactionSummaryItem(label = "Income", amount = totalIncome ?: 0L, icon = Icons.Default.TrendingUp, color = Color(0xFF4CAF50))
-                    TransactionSummaryItem(label = "Expense", amount = totalExpense ?: 0L, icon = Icons.Default.TrendingDown, color = Color(0xFFFFCDD2))
+                    TransactionSummaryItem(label = "Income", amount = totalIncome ?: 0L, icon = Icons.Default.TrendingUp, color = Color(0xFF4CAF50), currency = currencySymbol)
+                    TransactionSummaryItem(label = "Expense", amount = totalExpense ?: 0L, icon = Icons.Default.TrendingDown, color = Color(0xFFFFCDD2), currency = currencySymbol)
                 }
             }
         }
 
-        // Budget Info
         if (monthlyBudget > 0) {
             Column(modifier = Modifier.padding(bottom = 12.dp)) {
                 LinearProgressIndicator(
@@ -168,7 +167,6 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
             }
         }
 
-        // Input Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -267,18 +265,33 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { 
+                searchQuery = it
+                viewModel.updateSearchQuery(it)
+            },
+            placeholder = { Text("Search transactions...") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
         Text("History", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(expenseList) { item ->
-                TransactionItem(item, onDelete = { viewModel.deleteExpense(item) })
+                TransactionItem(item, currencySymbol, onDelete = { viewModel.deleteExpense(item) })
             }
         }
     }
 }
 
 @Composable
-fun TransactionSummaryItem(label: String, amount: Long, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color) {
+fun TransactionSummaryItem(label: String, amount: Long, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, currency: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(36.dp).background(Color.White.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -286,7 +299,7 @@ fun TransactionSummaryItem(label: String, amount: Long, icon: androidx.compose.u
         Spacer(modifier = Modifier.width(8.dp))
         Column {
             Text(label, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
-            Text("৳$amount", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text("$currency$amount", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
     }
 }
@@ -305,7 +318,7 @@ fun TypeToggleButton(text: String, isSelected: Boolean, onClick: () -> Unit, col
 }
 
 @Composable
-fun TransactionItem(item: com.shihab.practicesharedprefarence.model.Expense, onDelete: () -> Unit) {
+fun TransactionItem(item: com.shihab.practicesharedprefarence.model.Expense, currency: String, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
@@ -329,7 +342,7 @@ fun TransactionItem(item: com.shihab.practicesharedprefarence.model.Expense, onD
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    "${if (isIncome) "+" else "-"} ৳${item.amount}",
+                    "${if (isIncome) "+" else "-"} $currency${item.amount}",
                     fontWeight = FontWeight.ExtraBold,
                     color = if (isIncome) Color(0xFF4CAF50) else Color(0xFFF44336),
                     style = MaterialTheme.typography.bodyLarge

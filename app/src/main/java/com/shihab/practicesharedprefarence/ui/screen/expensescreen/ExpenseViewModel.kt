@@ -10,6 +10,9 @@ import com.shihab.practicesharedprefarence.data.ExpenseDatabase
 import com.shihab.practicesharedprefarence.data.PreferenceManager
 import com.shihab.practicesharedprefarence.model.Category
 import com.shihab.practicesharedprefarence.model.Expense
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -20,7 +23,14 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
     private val dao = database.expenseDao()
     private val preferenceManager = PreferenceManager(application)
 
-    val expenses = dao.getAllExpenses().asLiveData()
+    private val _searchQuery = MutableStateFlow("")
+    
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val expenses = _searchQuery.flatMapLatest { query ->
+        if (query.isEmpty()) dao.getAllExpenses()
+        else dao.searchExpenses(query)
+    }.asLiveData()
+
     val totalExpense = dao.getTotalExpense().asLiveData()
     val totalIncome = dao.getTotalIncome().asLiveData()
     val dailyExpenses = dao.getDailyExpenses().asLiveData()
@@ -29,6 +39,12 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
 
     private val _monthlyBudget = MutableLiveData<Float>(preferenceManager.getBudget())
     val monthlyBudget: LiveData<Float> = _monthlyBudget
+
+    val currencySymbol: LiveData<String> = MutableLiveData(preferenceManager.getCurrency())
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
 
     fun updateBudget(amount: Float) {
         preferenceManager.saveBudget(amount)

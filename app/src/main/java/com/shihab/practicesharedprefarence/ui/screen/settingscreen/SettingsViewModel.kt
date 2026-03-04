@@ -16,6 +16,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _isDarkMode = mutableStateOf(false)
     val isDarkMode: State<Boolean> = _isDarkMode
 
+    private val _currency = mutableStateOf("৳")
+    val currency: State<String> = _currency
+
     init {
         loadData()
     }
@@ -23,6 +26,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private fun loadData() {
         _userName.value = pref.getUserName()
         _isDarkMode.value = pref.isDarkMode()
+        _currency.value = pref.getCurrency()
     }
 
     fun saveUserName(name: String) {
@@ -33,5 +37,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun toggleDarkMode(isDark: Boolean) {
         _isDarkMode.value = isDark
         pref.setDarkMode(isDark)
+    }
+
+    fun saveCurrency(symbol: String) {
+        _currency.value = symbol
+        pref.saveCurrency(symbol)
     }
 }
