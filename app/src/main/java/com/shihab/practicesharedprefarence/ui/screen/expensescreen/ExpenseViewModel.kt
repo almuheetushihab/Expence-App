@@ -100,6 +100,13 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun exportToCSV(uri: Uri, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = backupManager.exportToCSV(uri)
+            onResult(success)
+        }
+    }
+
     fun importData(uri: Uri, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             val success = backupManager.importData(uri)

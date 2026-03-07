@@ -55,7 +55,18 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
     
     val categoryList by viewModel.getCategories(transactionType).observeAsState(initial = emptyList())
 
-    // Create Backup File Launcher
+    // CSV Export Launcher
+    val exportCSVLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let {
+            viewModel.exportToCSV(it) { success ->
+                Toast.makeText(context, if (success) "CSV exported successfully!" else "Failed to export CSV", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // JSON Backup Launcher
     val createBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -66,7 +77,7 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
         }
     }
 
-    // Restore Backup File Launcher
+    // Restore Backup Launcher
     val restoreBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -146,11 +157,11 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp)
             .statusBarsPadding()
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -171,10 +182,20 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                             newBudgetInput = monthlyBudget.toString()
                             showBudgetDialog = true 
                         },
-                        leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
+                        leadingIcon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null) }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Export to CSV (Excel)") },
+                        onClick = { 
+                            showBackupMenu = false
+                            val fileName = "expenses_${SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())}.csv"
+                            exportCSVLauncher.launch(fileName)
+                        },
+                        leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Backup Data") },
+                        text = { Text("Full Backup (JSON)") },
                         onClick = { 
                             showBackupMenu = false
                             val fileName = "finance_backup_${SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())}.json"
@@ -195,7 +216,7 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
         }
 
         Card(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
@@ -213,31 +234,28 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
         }
 
         if (monthlyBudget > 0) {
-            Column(modifier = Modifier.padding(bottom = 12.dp)) {
+            Column(modifier = Modifier.padding(bottom = 8.dp)) {
                 LinearProgressIndicator(
                     progress = { progress.coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
                     color = progressColor,
                     trackColor = progressColor.copy(alpha = 0.2f)
                 )
-                Text(
-                    text = "${(progress * 100).toInt()}% of budget used",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = progressColor,
-                    modifier = Modifier.align(Alignment.End).padding(top = 4.dp)
-                )
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Budget: $currencySymbol$monthlyBudget", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text("${(progress * 100).toInt()}% used", style = MaterialTheme.typography.bodySmall, color = progressColor, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)).padding(4.dp)) {
-                    TypeToggleButton(text = "Expense", isSelected = transactionType == "Expense", onClick = { transactionType = "Expense" }, color = Color.Red, modifier = Modifier.weight(1f))
+                    TypeToggleButton(text = "Expense", isSelected = transactionType == "Expense", onClick = { transactionType = "Expense" }, color = Color(0xFFF44336), modifier = Modifier.weight(1f))
                     TypeToggleButton(text = "Income", isSelected = transactionType == "Income", onClick = { transactionType = "Income" }, color = Color(0xFF4CAF50), modifier = Modifier.weight(1f))
                 }
 
@@ -247,7 +265,7 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                     OutlinedTextField(
                         value = amount,
                         onValueChange = { amount = it },
-                        label = { Text("Amount", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        label = { Text("Amount") },
                         modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         shape = RoundedCornerShape(12.dp),
@@ -259,22 +277,21 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                             value = category,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Category", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            label = { Text("Category") },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             singleLine = true,
                             trailingIcon = { 
-                                Icon(
-                                    Icons.Default.Add, 
-                                    "Add Category", 
-                                    Modifier.size(20.dp).clickable { showAddCategoryDialog = true }
-                                ) 
+                                IconButton(onClick = { expanded = true }) {
+                                    Icon(Icons.Default.ArrowDropDown, "Select")
+                                }
                             },
                             leadingIcon = { 
                                 Icon(
-                                    Icons.Default.ArrowDropDown, 
-                                    "Select", 
-                                    Modifier.size(20.dp).clickable { expanded = true }
+                                    Icons.Default.AddCircleOutline, 
+                                    "Add Category", 
+                                    Modifier.size(20.dp).clickable { showAddCategoryDialog = true },
+                                    tint = MaterialTheme.colorScheme.primary
                                 ) 
                             }
                         )
@@ -290,9 +307,6 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                                     }
                                 )
                             }
-                            if (categoryList.isEmpty()) {
-                                DropdownMenuItem(text = { Text("No categories") }, onClick = { expanded = false })
-                            }
                         }
                     }
                 }
@@ -302,7 +316,7 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("What for? (e.g. Lunch)") },
+                    label = { Text("Note (Optional)") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true
@@ -313,7 +327,7 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                 Button(
                     onClick = {
                         if (amount.isNotEmpty() && category.isNotEmpty()) {
-                            viewModel.addTransaction(amount, note.ifEmpty { "Other" }, category, transactionType)
+                            viewModel.addTransaction(amount, note.ifEmpty { "Transaction" }, category, transactionType)
                             amount = ""; note = ""
                         }
                     },
@@ -321,7 +335,7 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                     shape = RoundedCornerShape(12.dp),
                     enabled = amount.isNotEmpty() && category.isNotEmpty()
                 ) {
-                    Text("Save $transactionType", fontWeight = FontWeight.Bold)
+                    Text("Add $transactionType", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -334,19 +348,32 @@ fun ExpenseScreen(viewModel: ExpenseViewModel) {
                 searchQuery = it
                 viewModel.updateSearchQuery(it)
             },
-            placeholder = { Text("Search transactions...") },
+            placeholder = { Text("Search by note or category...") },
             modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            shape = RoundedCornerShape(12.dp),
-            singleLine = true
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+            shape = RoundedCornerShape(16.dp),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f)
+            )
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("History", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(12.dp))
+        Text("Transaction History", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
 
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = 16.dp)
+        ) {
             items(expenseList) { item ->
                 TransactionItem(item, currencySymbol, onDelete = { viewModel.deleteExpense(item) })
+            }
+            if (expenseList.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text("No transactions found", color = Color.Gray)
+                    }
+                }
             }
         }
     }
@@ -399,7 +426,7 @@ fun TransactionItem(item: com.shihab.practicesharedprefarence.model.Expense, cur
                 )
             }
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(item.note, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
+                Text(item.note, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${item.category} • ${item.date}", fontSize = 12.sp, color = Color.Gray)
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -410,7 +437,7 @@ fun TransactionItem(item: com.shihab.practicesharedprefarence.model.Expense, cur
                     style = MaterialTheme.typography.bodyLarge
                 )
                 IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.LightGray.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                 }
             }
         }

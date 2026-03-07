@@ -2,6 +2,8 @@ package com.shihab.practicesharedprefarence.ui.screen.chartscreen
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,10 +38,10 @@ fun ChartScreen(viewModel: ExpenseViewModel) {
     val categorySpending by viewModel.categorySpending.observeAsState(initial = emptyList())
     val totalExpense by viewModel.totalExpense.observeAsState(initial = 0L)
     val totalIncome by viewModel.totalIncome.observeAsState(initial = 0L)
+    val currencySymbol by viewModel.currencySymbol.observeAsState(initial = "৳")
 
     val modelProducer = remember { CartesianChartModelProducer() }
 
-    // Combine income and expense by date for the chart
     LaunchedEffect(dailyExpenses, dailyIncome) {
         if (dailyExpenses.isNotEmpty() || dailyIncome.isNotEmpty()) {
             val allDates = (dailyExpenses.map { it.date } + dailyIncome.map { it.date }).distinct().sorted()
@@ -66,7 +70,6 @@ fun ChartScreen(viewModel: ExpenseViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             item {
-                // Summary Cards
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                     shape = RoundedCornerShape(24.dp),
@@ -76,9 +79,29 @@ fun ChartScreen(viewModel: ExpenseViewModel) {
                         modifier = Modifier.padding(20.dp).fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        SummaryMiniItem("Total Income", totalIncome ?: 0L, Color(0xFF4CAF50))
-                        SummaryMiniItem("Total Expense", totalExpense ?: 0L, Color(0xFFF44336))
+                        SummaryMiniItem("Total Income", totalIncome ?: 0L, Color(0xFF4CAF50), currencySymbol)
+                        SummaryMiniItem("Total Expense", totalExpense ?: 0L, Color(0xFFF44336), currencySymbol)
                     }
+                }
+            }
+
+            // --- Pie Chart Section ---
+            if (categorySpending.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Expense Breakdown",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp).fillMaxWidth()
+                    )
+                    
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SimplePieChart(categorySpending, totalExpense ?: 1L)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
 
@@ -90,7 +113,7 @@ fun ChartScreen(viewModel: ExpenseViewModel) {
                 )
                 
                 Card(
-                    modifier = Modifier.fillMaxWidth().height(300.dp).padding(bottom = 16.dp),
+                    modifier = Modifier.fillMaxWidth().height(250.dp).padding(bottom = 16.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
@@ -112,7 +135,7 @@ fun ChartScreen(viewModel: ExpenseViewModel) {
 
             item {
                 Text(
-                    text = "Spending by Category",
+                    text = "Details by Category",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 16.dp, bottom = 8.dp).fillMaxWidth()
                 )
@@ -125,7 +148,7 @@ fun ChartScreen(viewModel: ExpenseViewModel) {
             } else {
                 items(categorySpending) { spending ->
                     val percentage = if ((totalExpense ?: 0L) > 0L) (spending.totalAmount.toFloat() / (totalExpense ?: 1L)) else 0f
-                    CategoryProgressItem(spending.category, spending.totalAmount, percentage)
+                    CategoryProgressItem(spending.category, spending.totalAmount, percentage, currencySymbol)
                 }
             }
             
@@ -135,15 +158,44 @@ fun ChartScreen(viewModel: ExpenseViewModel) {
 }
 
 @Composable
-fun SummaryMiniItem(label: String, amount: Long, color: Color) {
+fun SimplePieChart(data: List<com.shihab.practicesharedprefarence.data.CategorySpending>, total: Long) {
+    val colors = listOf(
+        Color(0xFF6200EE), Color(0xFF03DAC6), Color(0xFFFF0266),
+        Color(0xFFF44336), Color(0xFF4CAF50), Color(0xFF2196F3),
+        Color(0xFFFFEB3B), Color(0xFF9C27B0), Color(0xFF795548)
+    )
+
+    Canvas(modifier = Modifier.size(180.dp)) {
+        var startAngle = -90f
+        data.forEachIndexed { index, item ->
+            val sweepAngle = (item.totalAmount.toFloat() / total.toFloat()) * 360f
+            drawArc(
+                color = colors[index % colors.size],
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                style = Stroke(width = 40f, cap = StrokeCap.Round)
+            )
+            startAngle += sweepAngle
+        }
+    }
+    
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-        Text("৳$amount", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = color)
+        Text("Total", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        Text("Expenses", fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun CategoryProgressItem(category: String, amount: Long, percentage: Float) {
+fun SummaryMiniItem(label: String, amount: Long, color: Color, currency: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        Text("$currency$amount", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = color)
+    }
+}
+
+@Composable
+fun CategoryProgressItem(category: String, amount: Long, percentage: Float, currency: String) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
@@ -152,7 +204,7 @@ fun CategoryProgressItem(category: String, amount: Long, percentage: Float) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(category, fontWeight = FontWeight.Bold)
-                Text("৳$amount", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("$currency$amount", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(8.dp))
             LinearProgressIndicator(

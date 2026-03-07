@@ -32,6 +32,27 @@ class BackupManager(private val context: Context, private val dao: ExpenseDao) {
         }
     }
 
+    suspend fun exportToCSV(uri: Uri): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val expenses = dao.getAllExpensesList()
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                OutputStreamWriter(outputStream).use { writer ->
+                    // CSV Header
+                    writer.write("ID,Type,Category,Amount,Note,Date\n")
+                    // Data Rows
+                    expenses.forEach { expense ->
+                        val line = "${expense.id},${expense.type},${expense.category},${expense.amount},\"${expense.note}\",${expense.date}\n"
+                        writer.write(line)
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     suspend fun importData(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
